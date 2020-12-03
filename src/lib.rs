@@ -10,6 +10,9 @@ use warp::Filter;
 /// This uses the "x-forwarded-for" or "x-real-ip" headers set by reverse proxies.
 /// To stop clients from abusing these headers, only headers set by trusted remotes will be accepted.
 ///
+/// Note that if multiple forwarded-for addresses are present, wich can be the case when using nested reverse proxies,
+/// all proxies in the chain have to be within the list of trusted proxies.
+///
 /// ## Example
 ///
 /// ```no_run
@@ -44,17 +47,26 @@ pub fn real_ip(
 
 /// Creates a `Filter` that extracts the ip addresses from the the "forwarded for" chain
 pub fn get_forwarded_for() -> impl Filter<Extract = (Vec<IpAddr>,), Error = Infallible> + Clone {
-    warp::header::<String>("x-forwarded-for")
-        .map(|forwarded: String| {
-            forwarded
-                .split(',')
-                .map(str::trim)
-                .map(IpAddr::from_str)
-                .filter_map(Result::ok)
-                .collect::<Vec<IpAddr>>()
-        })
+    warp::header("x-forwarded-for")
+        .map(|list: IpList| list.0)
         .or(warp::header("x-real-ip").map(|ip| vec![ip]))
         .unify()
         .or(warp::any().map(|| vec![]))
         .unify()
+}
+
+/// Newtype so we can implement FromStr
+struct IpList(Vec<IpAddr>);
+
+impl FromStr for IpList {
+    type Err = <IpAddr as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let vec = s
+            .split(',')
+            .map(str::trim)
+            .map(IpAddr::from_str)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(IpList(vec))
+    }
 }
