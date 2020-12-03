@@ -4,10 +4,13 @@ use warp::filters::addr::remote;
 use warp::Filter;
 
 /// Creates a `Filter` that provides the "real ip" of the connected client.
-pub fn real_ip<'a>(
-    trusted_proxies: &'a [IpAddr],
-) -> impl Filter<Extract = (Option<IpAddr>,), Error = Infallible> + Clone + 'a {
-    let forwarded_for = warp::header::<IpAddr>("X-FORWARDED-FOR")
+///
+/// This uses the "x-forwarded-for" or "x-real-ip" headers set by reverse proxies.
+/// To stop clients from abusing these headers, only headers set by trusted remotes will be accepted.
+pub fn real_ip(
+    trusted_proxies: Vec<IpAddr>,
+) -> impl Filter<Extract = (Option<IpAddr>,), Error = Infallible> + Clone {
+    let forwarded_for = warp::header::<IpAddr>("x-forwarded-for")
         .or(warp::header("x-real-ip"))
         .unify()
         .map(Some)

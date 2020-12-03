@@ -8,3 +8,6 @@ categories = ["web-programming::http-server"]
 
 [dependencies]
 warp = { version = "0.2" }
+
+[dev-dependencies]
+tokio = { version = "0.2", features = ["macros"] }

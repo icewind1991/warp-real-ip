@@ -1,0 +1,41 @@
+use std::net::IpAddr;
+use warp::Filter;
+use warp_real_ip::real_ip;
+
+fn serve<'a>(trusted: Vec<IpAddr>) -> impl Filter<Extract = (String,)> + 'a {
+    warp::any()
+        .and(real_ip(trusted))
+        .map(|addr: Option<IpAddr>| addr.unwrap().to_string())
+}
+
+#[tokio::test]
+async fn test_not_forwarded() {
+    let remote: IpAddr = [1, 2, 3, 4].into();
+    let res = warp::test::request()
+        .remote_addr((remote, 80).into())
+        .reply(&serve(vec![]))
+        .await;
+    assert_eq!(res.body(), "1.2.3.4");
+}
+
+#[tokio::test]
+async fn test_not_trusted() {
+    let remote: IpAddr = [1, 2, 3, 4].into();
+    let res = warp::test::request()
+        .remote_addr((remote, 80).into())
+        .header("x-forwarded-for", "10.10.10.10")
+        .reply(&serve(vec![]))
+        .await;
+    assert_eq!(res.body(), "1.2.3.4");
+}
+
+#[tokio::test]
+async fn test_trusted() {
+    let remote: IpAddr = [1, 2, 3, 4].into();
+    let res = warp::test::request()
+        .remote_addr((remote, 80).into())
+        .header("x-forwarded-for", "10.10.10.10")
+        .reply(&serve(vec![remote]))
+        .await;
+    assert_eq!(res.body(), "10.10.10.10");
+}
