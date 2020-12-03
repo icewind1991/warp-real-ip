@@ -1,5 +1,7 @@
 use std::convert::Infallible;
+use std::iter::once;
 use std::net::{IpAddr, SocketAddr};
+use std::str::FromStr;
 use warp::filters::addr::remote;
 use warp::Filter;
 
@@ -23,23 +25,36 @@ use warp::Filter;
 pub fn real_ip(
     trusted_proxies: Vec<IpAddr>,
 ) -> impl Filter<Extract = (Option<IpAddr>,), Error = Infallible> + Clone {
-    let forwarded_for = warp::header::<IpAddr>("x-forwarded-for")
-        .or(warp::header("x-real-ip"))
-        .unify()
-        .map(Some)
-        .or(warp::any().map(|| None))
-        .unify();
-
-    remote().and(forwarded_for).map(
-        move |addr: Option<SocketAddr>, forwarded_for: Option<IpAddr>| {
+    remote().and(get_forwarded_for()).map(
+        move |addr: Option<SocketAddr>, forwarded_for: Vec<IpAddr>| {
             addr.map(|addr| {
-                let ip = addr.ip();
-                if trusted_proxies.contains(&ip) {
-                    forwarded_for.unwrap_or(ip)
-                } else {
-                    ip
+                let hops = forwarded_for.iter().copied().chain(once(addr.ip()));
+                for hop in hops.rev() {
+                    if !trusted_proxies.contains(&hop) {
+                        return hop;
+                    }
                 }
+
+                // all hops were trusted, return the last one
+                forwarded_for.first().copied().unwrap_or(addr.ip())
             })
         },
     )
+}
+
+/// Creates a `Filter` that extracts the ip addresses from the the "forwarded for" chain
+pub fn get_forwarded_for() -> impl Filter<Extract = (Vec<IpAddr>,), Error = Infallible> + Clone {
+    warp::header::<String>("x-forwarded-for")
+        .map(|forwarded: String| {
+            forwarded
+                .split(',')
+                .map(str::trim)
+                .map(IpAddr::from_str)
+                .filter_map(Result::ok)
+                .collect::<Vec<IpAddr>>()
+        })
+        .or(warp::header("x-real-ip").map(|ip| vec![ip]))
+        .unify()
+        .or(warp::any().map(|| vec![]))
+        .unify()
 }
