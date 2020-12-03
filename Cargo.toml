@@ -3,7 +3,8 @@ name = "warp-real-ip"
 version = "0.1.0"
 authors = ["Robin Appelman <robin@icewind.nl>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+keywords = ["warp"]
+categories = ["web-programming::http-server"]
 
 [dependencies]
+warp = { version = "0.2" }
