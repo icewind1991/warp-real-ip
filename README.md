@@ -2,7 +2,7 @@
 
 Warp filter to get the "real ip" of the remote client
 
-This uses the "x-forwarded-for" or "x-real-ip" headers set by reverse proxies.
+This uses the "x-forwarded-for", "x-real-ip" or "forwarded" headers set by reverse proxies.
 To stop clients from abusing these headers, only headers set by trusted remotes will be accepted.
 
 ## Example
