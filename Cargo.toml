@@ -1,7 +1,7 @@
 [package]
 name = "warp-real-ip"
 description = "Warp filter to get the \"real ip\" of the remote client"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Robin Appelman <robin@icewind.nl>"]
 edition = "2018"
 keywords = ["warp"]
@@ -12,6 +12,7 @@ documentation = "https://docs.rs/warp-real-ip"
 
 [dependencies]
 warp = { version = "0.2" }
+rfc7239 = "0.1"
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["macros"] }

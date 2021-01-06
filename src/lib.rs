@@ -1,3 +1,4 @@
+use rfc7239::{parse, Forwarded, NodeIdentifier, NodeName};
 use std::convert::Infallible;
 use std::iter::once;
 use std::net::{IpAddr, SocketAddr};
@@ -48,25 +49,47 @@ pub fn real_ip(
 /// Creates a `Filter` that extracts the ip addresses from the the "forwarded for" chain
 pub fn get_forwarded_for() -> impl Filter<Extract = (Vec<IpAddr>,), Error = Infallible> + Clone {
     warp::header("x-forwarded-for")
-        .map(|list: IpList| list.0)
+        .map(|list: CommaSeparated<IpAddr>| list.into_inner())
         .or(warp::header("x-real-ip").map(|ip| vec![ip]))
+        .unify()
+        .or(warp::header("forwarded").map(|header: String| {
+            parse(&header)
+                .filter_map(|forward| match forward {
+                    Ok(Forwarded {
+                        forwarded_for:
+                            Some(NodeIdentifier {
+                                name: NodeName::Ip(ip),
+                                ..
+                            }),
+                        ..
+                    }) => Some(ip),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        }))
         .unify()
         .or(warp::any().map(|| vec![]))
         .unify()
 }
 
 /// Newtype so we can implement FromStr
-struct IpList(Vec<IpAddr>);
+struct CommaSeparated<T>(Vec<T>);
 
-impl FromStr for IpList {
-    type Err = <IpAddr as FromStr>::Err;
+impl<T> CommaSeparated<T> {
+    pub fn into_inner(self) -> Vec<T> {
+        self.0
+    }
+}
+
+impl<T: FromStr> FromStr for CommaSeparated<T> {
+    type Err = T::Err;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let vec = s
             .split(',')
             .map(str::trim)
-            .map(IpAddr::from_str)
+            .map(T::from_str)
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(IpList(vec))
+        Ok(CommaSeparated(vec))
     }
 }

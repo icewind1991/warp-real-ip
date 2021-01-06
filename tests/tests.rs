@@ -61,3 +61,25 @@ async fn test_nested_allowed() {
         .await;
     assert_eq!(res.body(), "11.11.11.11");
 }
+
+#[tokio::test]
+async fn test_trusted_forwarded() {
+    let remote: IpAddr = [1, 2, 3, 4].into();
+    let res = warp::test::request()
+        .remote_addr((remote, 80).into())
+        .header("forwarded", "for=10.10.10.10")
+        .reply(&serve(vec![remote]))
+        .await;
+    assert_eq!(res.body(), "10.10.10.10");
+}
+
+#[tokio::test]
+async fn test_trusted_forwarded_no_for() {
+    let remote: IpAddr = [1, 2, 3, 4].into();
+    let res = warp::test::request()
+        .remote_addr((remote, 80).into())
+        .header("forwarded", "by=11.11.11.11")
+        .reply(&serve(vec![remote]))
+        .await;
+    assert_eq!(res.body(), "1.2.3.4");
+}
