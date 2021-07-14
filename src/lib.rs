@@ -1,10 +1,48 @@
+use ipnetwork::{IpNetwork, Ipv4Network, Ipv6Network};
 use rfc7239::{parse, Forwarded, NodeIdentifier, NodeName};
 use std::convert::Infallible;
-use std::iter::once;
+use std::iter::{once, FromIterator, IntoIterator};
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use warp::filters::addr::remote;
 use warp::Filter;
+
+/// Represents a set of IP networks.
+#[derive(Debug, Clone)]
+pub struct IpNetworks {
+    networks: Vec<IpNetwork>,
+}
+
+impl IpNetworks {
+    /// Checks if addr is part of any IP networks included.
+    pub fn contains(&self, addr: &IpAddr) -> bool {
+        self.networks.iter().any(|&network| network.contains(*addr))
+    }
+
+    /// Special constructor that builds IpNetwork from an iterator of IP addresses.
+    pub fn from_ipaddr_iter<'a, T: Iterator<Item = &'a IpAddr>>(addrs: T) -> Self {
+        Self::from_iter(addrs.map(|&addr| -> IpNetwork {
+            match addr {
+                IpAddr::V4(addr) => Ipv4Network::from(addr).into(),
+                IpAddr::V6(addr) => Ipv6Network::from(addr).into(),
+            }
+        }))
+    }
+}
+
+impl From<&Vec<IpAddr>> for IpNetworks {
+    fn from(addrs: &Vec<IpAddr>) -> Self {
+        Self::from_ipaddr_iter(addrs.iter())
+    }
+}
+
+impl FromIterator<IpNetwork> for IpNetworks {
+    fn from_iter<T: IntoIterator<Item = IpNetwork>>(addrs: T) -> Self {
+        IpNetworks {
+            networks: Vec::<IpNetwork>::from_iter(addrs),
+        }
+    }
+}
 
 /// Creates a `Filter` that provides the "real ip" of the connected client.
 ///
@@ -27,7 +65,7 @@ use warp::Filter;
 ///     .map(|addr: Option<IpAddr>| format!("Hello {}", addr.unwrap()));
 /// ```
 pub fn real_ip(
-    trusted_proxies: Vec<IpAddr>,
+    trusted_proxies: IpNetworks,
 ) -> impl Filter<Extract = (Option<IpAddr>,), Error = Infallible> + Clone {
     remote().and(get_forwarded_for()).map(
         move |addr: Option<SocketAddr>, forwarded_for: Vec<IpAddr>| {
