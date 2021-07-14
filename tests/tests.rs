@@ -1,10 +1,10 @@
 use std::net::IpAddr;
 use warp::Filter;
-use warp_real_ip::{IpNetworks, real_ip};
+use warp_real_ip::real_ip;
 
 fn serve<'a>(trusted: Vec<IpAddr>) -> impl Filter<Extract = (String,)> + 'a {
     warp::any()
-        .and(real_ip(IpNetworks::from_ipaddr_iter(trusted.iter())))
+        .and(real_ip((&trusted).into()))
         .map(|addr: Option<IpAddr>| addr.unwrap().to_string())
 }
 

@@ -7,16 +7,19 @@ use std::str::FromStr;
 use warp::filters::addr::remote;
 use warp::Filter;
 
-#[derive(Clone)]
+/// Represents a set of IP networks.
+#[derive(Debug, Clone)]
 pub struct IpNetworks {
     networks: Vec<IpNetwork>,
 }
 
 impl IpNetworks {
+    /// Checks if addr is part of any IP networks included.
     pub fn contains(&self, addr: &IpAddr) -> bool {
         self.networks.iter().any(|&network| network.contains(*addr))
     }
 
+    /// Special constructor that builds IpNetwork from an iterator of IP addresses.
     pub fn from_ipaddr_iter<'a, T: Iterator<Item = &'a IpAddr>>(addrs: T) -> Self {
         Self::from_iter(addrs.map(|&addr| -> IpNetwork {
             match addr {
@@ -24,6 +27,12 @@ impl IpNetworks {
                 IpAddr::V6(addr) => Ipv6Network::from(addr).into(),
             }
         }))
+    }
+}
+
+impl From<&Vec<IpAddr>> for IpNetworks {
+    fn from(addrs: &Vec<IpAddr>) -> Self {
+        Self::from_ipaddr_iter(addrs.iter())
     }
 }
 
