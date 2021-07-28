@@ -4,7 +4,7 @@ use warp_real_ip::real_ip;
 
 fn serve<'a>(trusted: Vec<IpAddr>) -> impl Filter<Extract = (String,)> + 'a {
     warp::any()
-        .and(real_ip((&trusted).into()))
+        .and(real_ip(trusted))
         .map(|addr: Option<IpAddr>| addr.unwrap().to_string())
 }
 

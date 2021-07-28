@@ -30,6 +30,12 @@ impl IpNetworks {
     }
 }
 
+impl From<Vec<IpAddr>> for IpNetworks {
+    fn from(addrs: Vec<IpAddr>) -> Self {
+        Self::from_ipaddr_iter(addrs.iter())
+    }
+}
+
 impl From<&Vec<IpAddr>> for IpNetworks {
     fn from(addrs: &Vec<IpAddr>) -> Self {
         Self::from_ipaddr_iter(addrs.iter())
@@ -65,8 +71,9 @@ impl FromIterator<IpNetwork> for IpNetworks {
 ///     .map(|addr: Option<IpAddr>| format!("Hello {}", addr.unwrap()));
 /// ```
 pub fn real_ip(
-    trusted_proxies: IpNetworks,
+    trusted_proxies: impl Into<IpNetworks>,
 ) -> impl Filter<Extract = (Option<IpAddr>,), Error = Infallible> + Clone {
+    let trusted_proxies = trusted_proxies.into();
     remote().and(get_forwarded_for()).map(
         move |addr: Option<SocketAddr>, forwarded_for: Vec<IpAddr>| {
             addr.map(|addr| {
