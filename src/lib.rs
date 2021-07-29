@@ -207,7 +207,7 @@ fn maybe_quoted(x: &str) -> Cow<str> {
 }
 
 fn maybe_bracketed(x: &str) -> &str {
-    if x.as_bytes()[0] == (b'[') && x.as_bytes()[x.len() - 1] == (b']') {
+    if x.as_bytes().first() == Some(&b'[') && x.as_bytes().last() == Some(&b']') {
         &x[1..x.len() - 1]
     } else {
         x
