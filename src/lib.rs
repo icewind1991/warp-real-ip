@@ -41,7 +41,7 @@ pub fn real_ip(
                 }
 
                 // all hops were trusted, return the last one
-                forwarded_for.first().copied().unwrap_or(addr.ip())
+                forwarded_for.first().copied().unwrap_or_else(|| addr.ip())
             })
         },
     )
@@ -72,7 +72,7 @@ pub fn get_forwarded_for() -> impl Filter<Extract = (Vec<IpAddr>,), Error = Infa
                 .collect::<Vec<_>>()
         }))
         .unify()
-        .or(warp::any().map(|| vec![]))
+        .or(warp::any().map(Vec::new))
         .unify()
 }
 
@@ -110,59 +110,56 @@ impl<'a> Iterator for CommaSeparatedIterator<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match self.char_indices.next() {
-                Some((i, c)) => match match self.state {
-                    CommaSeparatedIteratorState::Default => match c {
-                        '"' => {
-                            self.s = i;
-                            (None, CommaSeparatedIteratorState::Quoted)
-                        }
-                        ' ' | '\t' => (None, CommaSeparatedIteratorState::Default),
-                        ',' => (
-                            Some(Some(&self.target[i..i])),
-                            CommaSeparatedIteratorState::Default,
-                        ),
-                        _ => {
-                            self.s = i;
-                            (None, CommaSeparatedIteratorState::Token)
-                        }
-                    },
-                    CommaSeparatedIteratorState::Quoted => match c {
-                        '"' => (
-                            Some(Some(&self.target[self.s..i + 1])),
-                            CommaSeparatedIteratorState::PostAmbleForQuoted,
-                        ),
-                        '\\' => (None, CommaSeparatedIteratorState::QuotedPair),
-                        _ => (None, CommaSeparatedIteratorState::Quoted),
-                    },
-                    CommaSeparatedIteratorState::QuotedPair => {
+        while let Some((i, c)) = self.char_indices.next() {
+            match match self.state {
+                CommaSeparatedIteratorState::Default => match c {
+                    '"' => {
+                        self.s = i;
                         (None, CommaSeparatedIteratorState::Quoted)
                     }
-                    CommaSeparatedIteratorState::Token => match c {
-                        ',' => (
-                            Some(Some(&self.target[self.s..i])),
-                            CommaSeparatedIteratorState::Default,
-                        ),
-                        _ => (None, CommaSeparatedIteratorState::Token),
-                    },
-                    CommaSeparatedIteratorState::PostAmbleForQuoted => match c {
-                        ',' => (None, CommaSeparatedIteratorState::Default),
-                        _ => (None, CommaSeparatedIteratorState::PostAmbleForQuoted),
-                    },
-                } {
-                    (Some(next), next_state) => {
-                        self.state = next_state;
-                        return next;
-                    }
-                    (None, next_state) => {
-                        self.state = next_state;
+                    ' ' | '\t' => (None, CommaSeparatedIteratorState::Default),
+                    ',' => (
+                        Some(Some(&self.target[i..i])),
+                        CommaSeparatedIteratorState::Default,
+                    ),
+                    _ => {
+                        self.s = i;
+                        (None, CommaSeparatedIteratorState::Token)
                     }
                 },
-                None => break,
+                CommaSeparatedIteratorState::Quoted => match c {
+                    '"' => (
+                        Some(Some(&self.target[self.s..i + 1])),
+                        CommaSeparatedIteratorState::PostAmbleForQuoted,
+                    ),
+                    '\\' => (None, CommaSeparatedIteratorState::QuotedPair),
+                    _ => (None, CommaSeparatedIteratorState::Quoted),
+                },
+                CommaSeparatedIteratorState::QuotedPair => {
+                    (None, CommaSeparatedIteratorState::Quoted)
+                }
+                CommaSeparatedIteratorState::Token => match c {
+                    ',' => (
+                        Some(Some(&self.target[self.s..i])),
+                        CommaSeparatedIteratorState::Default,
+                    ),
+                    _ => (None, CommaSeparatedIteratorState::Token),
+                },
+                CommaSeparatedIteratorState::PostAmbleForQuoted => match c {
+                    ',' => (None, CommaSeparatedIteratorState::Default),
+                    _ => (None, CommaSeparatedIteratorState::PostAmbleForQuoted),
+                },
+            } {
+                (Some(next), next_state) => {
+                    self.state = next_state;
+                    return next;
+                }
+                (None, next_state) => {
+                    self.state = next_state;
+                }
             }
         }
-        return match self.state {
+        match self.state {
             CommaSeparatedIteratorState::Default
             | CommaSeparatedIteratorState::PostAmbleForQuoted => None,
             CommaSeparatedIteratorState::Quoted | CommaSeparatedIteratorState::QuotedPair => {
@@ -173,7 +170,7 @@ impl<'a> Iterator for CommaSeparatedIterator<'a> {
                 self.state = CommaSeparatedIteratorState::Default;
                 Some(&self.target[self.s..])
             }
-        };
+        }
     }
 }
 
@@ -210,7 +207,7 @@ fn maybe_quoted(x: &str) -> Cow<str> {
 }
 
 fn maybe_bracketed(x: &str) -> &str {
-    if x.as_bytes()[0] == ('[' as u8) && x.as_bytes()[x.len() - 1] == (']' as u8) {
+    if x.as_bytes()[0] == (b'[') && x.as_bytes()[x.len() - 1] == (b']') {
         &x[1..x.len() - 1]
     } else {
         x
