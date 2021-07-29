@@ -111,7 +111,7 @@ impl<'a> Iterator for CommaSeparatedIterator<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((i, c)) = self.char_indices.next() {
-            match match self.state {
+            let (next, next_state) = match self.state {
                 CommaSeparatedIteratorState::Default => match c {
                     '"' => {
                         self.s = i;
@@ -149,7 +149,8 @@ impl<'a> Iterator for CommaSeparatedIterator<'a> {
                     ',' => (None, CommaSeparatedIteratorState::Default),
                     _ => (None, CommaSeparatedIteratorState::PostAmbleForQuoted),
                 },
-            } {
+            };
+            match (next, next_state) {
                 (Some(next), next_state) => {
                     self.state = next_state;
                     return next;
