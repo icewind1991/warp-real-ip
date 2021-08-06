@@ -18,27 +18,28 @@ impl IpNetworks {
     pub fn contains(&self, addr: &IpAddr) -> bool {
         self.networks.iter().any(|&network| network.contains(*addr))
     }
-
-    /// Special constructor that builds IpNetwork from an iterator of IP addresses.
-    pub fn from_ipaddr_iter<'a, T: Iterator<Item = &'a IpAddr>>(addrs: T) -> Self {
-        Self::from_iter(addrs.map(|&addr| -> IpNetwork {
-            match addr {
-                IpAddr::V4(addr) => Ipv4Network::from(addr).into(),
-                IpAddr::V6(addr) => Ipv6Network::from(addr).into(),
-            }
-        }))
-    }
 }
 
 impl From<Vec<IpAddr>> for IpNetworks {
     fn from(addrs: Vec<IpAddr>) -> Self {
-        Self::from_ipaddr_iter(addrs.iter())
+        Self::from_iter(addrs.iter())
     }
 }
 
 impl From<&Vec<IpAddr>> for IpNetworks {
     fn from(addrs: &Vec<IpAddr>) -> Self {
-        Self::from_ipaddr_iter(addrs.iter())
+        Self::from_iter(addrs.iter())
+    }
+}
+
+impl<'a> FromIterator<&'a IpAddr> for IpNetworks {
+    fn from_iter<T: IntoIterator<Item = &'a IpAddr>>(addrs: T) -> Self {
+        Self::from_iter(addrs.into_iter().map(|&addr| -> IpNetwork {
+            match addr {
+                IpAddr::V4(addr) => Ipv4Network::from(addr).into(),
+                IpAddr::V6(addr) => Ipv6Network::from(addr).into(),
+            }
+        }))
     }
 }
 
