@@ -1,4 +1,4 @@
-use ipnetwork::{IpNetwork, Ipv4Network, Ipv6Network};
+use ipnetwork::IpNetwork;
 use rfc7239::{parse, Forwarded, NodeIdentifier, NodeName};
 use std::borrow::Cow;
 use std::convert::Infallible;
@@ -23,27 +23,19 @@ impl IpNetworks {
 
 impl From<Vec<IpAddr>> for IpNetworks {
     fn from(addrs: Vec<IpAddr>) -> Self {
-        addrs.iter().collect()
+        addrs.into_iter().collect()
     }
 }
 
-impl From<&Vec<IpAddr>> for IpNetworks {
-    fn from(addrs: &Vec<IpAddr>) -> Self {
-        addrs.iter().collect()
+impl From<&[IpAddr]> for IpNetworks {
+    fn from(addrs: &[IpAddr]) -> Self {
+        addrs.iter().copied().collect()
     }
 }
 
-impl<'a> FromIterator<&'a IpAddr> for IpNetworks {
-    fn from_iter<T: IntoIterator<Item = &'a IpAddr>>(addrs: T) -> Self {
-        addrs
-            .into_iter()
-            .map(|&addr| -> IpNetwork {
-                match addr {
-                    IpAddr::V4(addr) => Ipv4Network::from(addr).into(),
-                    IpAddr::V6(addr) => Ipv6Network::from(addr).into(),
-                }
-            })
-            .collect()
+impl FromIterator<IpAddr> for IpNetworks {
+    fn from_iter<T: IntoIterator<Item = IpAddr>>(addrs: T) -> Self {
+        addrs.into_iter().map(IpNetwork::from).collect()
     }
 }
 
