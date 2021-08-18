@@ -23,31 +23,34 @@ impl IpNetworks {
 
 impl From<Vec<IpAddr>> for IpNetworks {
     fn from(addrs: Vec<IpAddr>) -> Self {
-        Self::from_iter(addrs.iter())
+        addrs.iter().collect()
     }
 }
 
 impl From<&Vec<IpAddr>> for IpNetworks {
     fn from(addrs: &Vec<IpAddr>) -> Self {
-        Self::from_iter(addrs.iter())
+        addrs.iter().collect()
     }
 }
 
 impl<'a> FromIterator<&'a IpAddr> for IpNetworks {
     fn from_iter<T: IntoIterator<Item = &'a IpAddr>>(addrs: T) -> Self {
-        Self::from_iter(addrs.into_iter().map(|&addr| -> IpNetwork {
-            match addr {
-                IpAddr::V4(addr) => Ipv4Network::from(addr).into(),
-                IpAddr::V6(addr) => Ipv6Network::from(addr).into(),
-            }
-        }))
+        addrs
+            .into_iter()
+            .map(|&addr| -> IpNetwork {
+                match addr {
+                    IpAddr::V4(addr) => Ipv4Network::from(addr).into(),
+                    IpAddr::V6(addr) => Ipv6Network::from(addr).into(),
+                }
+            })
+            .collect()
     }
 }
 
 impl FromIterator<IpNetwork> for IpNetworks {
     fn from_iter<T: IntoIterator<Item = IpNetwork>>(addrs: T) -> Self {
         IpNetworks {
-            networks: Vec::<IpNetwork>::from_iter(addrs),
+            networks: addrs.into_iter().collect(),
         }
     }
 }
@@ -162,7 +165,7 @@ impl<'a> Iterator for CommaSeparatedIterator<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((i, c)) = self.char_indices.next() {
+        for (i, c) in &mut self.char_indices {
             let (next, next_state) = match (self.state, c) {
                 (CommaSeparatedIteratorState::Default, '"') => {
                     self.s = i;
