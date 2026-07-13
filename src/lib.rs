@@ -1,3 +1,4 @@
+use comma_separated::CommaSeparatedIterator;
 use ipnetwork::IpNetwork;
 use rfc7239::{parse, Forwarded, NodeIdentifier, NodeName};
 use std::borrow::Cow;
@@ -117,106 +118,12 @@ pub fn get_forwarded_for() -> impl Filter<Extract = (Vec<IpAddr>,), Error = Infa
         .unify()
 }
 
-#[derive(Copy, Clone)]
-enum CommaSeparatedIteratorState {
-    /// Start of string or after a ',' (including whitespace)
-    Default,
-    /// Inside a double quote
-    Quoted,
-    /// After escape character inside quote
-    QuotedPair,
-    /// Non quoted part
-    Token,
-    /// After closing double quote
-    PostAmbleForQuoted,
-}
-
-struct CommaSeparatedIterator<'a> {
-    /// target
-    target: &'a str,
-    /// iterator
-    char_indices: std::str::CharIndices<'a>,
-    /// current scanner state
-    state: CommaSeparatedIteratorState,
-    /// start position of the last token found
-    s: usize,
-}
-
-impl<'a> CommaSeparatedIterator<'a> {
-    pub fn new(target: &'a str) -> Self {
-        Self {
-            target,
-            char_indices: target.char_indices(),
-            state: CommaSeparatedIteratorState::Default,
-            s: 0,
-        }
-    }
-}
-
-impl<'a> Iterator for CommaSeparatedIterator<'a> {
-    type Item = &'a str;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        for (i, c) in &mut self.char_indices {
-            let (next, next_state) = match (self.state, c) {
-                (CommaSeparatedIteratorState::Default, '"') => {
-                    self.s = i;
-                    (None, CommaSeparatedIteratorState::Quoted)
-                }
-                (CommaSeparatedIteratorState::Default, ' ' | '\t') => {
-                    (None, CommaSeparatedIteratorState::Default)
-                }
-                (CommaSeparatedIteratorState::Default, ',') => (
-                    Some(Some(&self.target[i..i])),
-                    CommaSeparatedIteratorState::Default,
-                ),
-                (CommaSeparatedIteratorState::Default, _) => {
-                    self.s = i;
-                    (None, CommaSeparatedIteratorState::Token)
-                }
-                (CommaSeparatedIteratorState::Quoted, '"') => (
-                    Some(Some(&self.target[self.s..i + 1])),
-                    CommaSeparatedIteratorState::PostAmbleForQuoted,
-                ),
-                (CommaSeparatedIteratorState::Quoted, '\\') => {
-                    (None, CommaSeparatedIteratorState::QuotedPair)
-                }
-                (CommaSeparatedIteratorState::QuotedPair, _) => {
-                    (None, CommaSeparatedIteratorState::Quoted)
-                }
-                (CommaSeparatedIteratorState::Token, ',') => (
-                    Some(Some(&self.target[self.s..i])),
-                    CommaSeparatedIteratorState::Default,
-                ),
-                (CommaSeparatedIteratorState::PostAmbleForQuoted, ',') => {
-                    (None, CommaSeparatedIteratorState::Default)
-                }
-                (current_state, _) => (None, current_state),
-            };
-            self.state = next_state;
-            if let Some(next) = next {
-                return next;
-            }
-        }
-        match self.state {
-            CommaSeparatedIteratorState::Default
-            | CommaSeparatedIteratorState::PostAmbleForQuoted => None,
-            CommaSeparatedIteratorState::Quoted
-            | CommaSeparatedIteratorState::QuotedPair
-            | CommaSeparatedIteratorState::Token => {
-                self.state = CommaSeparatedIteratorState::Default;
-                Some(&self.target[self.s..])
-            }
-        }
-    }
-}
-
 enum EscapeState {
     Normal,
     Escaped,
 }
 
-fn maybe_quoted(x: &str) -> Cow<str> {
+fn maybe_quoted(x: &str) -> Cow<'_, str> {
     let mut i = x.chars();
     if i.next() == Some('"') {
         let mut s = String::with_capacity(x.len());
@@ -278,8 +185,10 @@ mod tests {
     #[test]
     fn test_comma_separated_iterator() {
         assert_eq!(
-            vec!["abc", "def", "ghi", "jkl ", "mno", "pqr"],
-            CommaSeparatedIterator::new("abc,def, ghi,\tjkl , mno,\tpqr").collect::<Vec<&str>>()
+            vec!["abc", "def", "ghi", "jkl", "mno", "pqr"],
+            CommaSeparatedIterator::new("abc,def, ghi,\tjkl , mno,\tpqr")
+                .map(str::trim)
+                .collect::<Vec<&str>>()
         );
         assert_eq!(
             vec![
@@ -294,6 +203,7 @@ mod tests {
             CommaSeparatedIterator::new(
                 "abc,\"def\", \"ghi\",\t\"jkl\" , \"mno\",\tpqr, \"abc, def\""
             )
+            .map(str::trim)
             .collect::<Vec<&str>>()
         );
     }

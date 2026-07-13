@@ -1,19 +1,22 @@
 [package]
 name = "warp-real-ip"
 description = "Warp filter to get the \"real ip\" of the remote client"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Robin Appelman <robin@icewind.nl>"]
-edition = "2018"
+edition = "2024"
 keywords = ["warp"]
 categories = ["web-programming::http-server"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/icewind1991/warp-real-ip"
 documentation = "https://docs.rs/warp-real-ip"
+rust-version = "1.85.0"
 
 [dependencies]
-warp = { version = "0.3" }
-rfc7239 = "0.1"
-ipnetwork = "0.18"
+warp = { version = "0.4" }
+rfc7239 = "0.1.3"
+ipnetwork = "0.21"
+comma-separated = "0.1.0"
 
 [dev-dependencies]
-tokio = { version = "1.0", features = ["macros"] }
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+warp = { version = "0.4", features = ["test"] }
